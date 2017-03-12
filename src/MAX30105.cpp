@@ -151,12 +151,15 @@ MAX30105::MAX30105() {
   // Constructor
 }
 
-boolean MAX30105::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t i2caddr) {
+boolean MAX30105::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t sclPin, uint8_t sdaPin, uint8_t i2caddr) {
 
   _i2cPort = &wirePort; //Grab which port the user wants us to use
 
-  _i2cPort->begin();
-  _i2cPort->setClock(i2cSpeed);
+  _i2cPort->beginOnPins(sclPin,sdaPin);
+  //_i2cPort->setClock(i2cSpeed);
+  if(i2cSpeed != 100000){
+    NRF_TWI1->FREQUENCY = TWI_FREQUENCY_FREQUENCY_K400 << TWI_FREQUENCY_FREQUENCY_Pos; 
+  }
 
   _i2caddr = i2caddr;
 
@@ -638,7 +641,7 @@ uint16_t MAX30105::check(void)
 
       //Request toGet number of bytes from sensor
       _i2cPort->requestFrom(MAX30105_ADDRESS, toGet);
-      
+
       while (toGet > 0)
       {
         sense.head++; //Advance the head of the storage struct
@@ -655,7 +658,7 @@ uint16_t MAX30105::check(void)
 
         //Convert array to long
         memcpy(&tempLong, temp, sizeof(tempLong));
-		
+
 		tempLong &= 0x3FFFF; //Zero out all but 18 bits
 
         sense.red[sense.head] = tempLong; //Store this reading into the sense array
@@ -672,7 +675,7 @@ uint16_t MAX30105::check(void)
           memcpy(&tempLong, temp, sizeof(tempLong));
 
 		  tempLong &= 0x3FFFF; //Zero out all but 18 bits
-          
+
 		  sense.IR[sense.head] = tempLong;
         }
 
@@ -708,7 +711,7 @@ uint16_t MAX30105::check(void)
 bool MAX30105::safeCheck(uint8_t maxTimeToCheck)
 {
   uint32_t markTime = millis();
-  
+
   while(1)
   {
 	if(millis() - markTime > maxTimeToCheck) return(false);
@@ -740,7 +743,7 @@ uint8_t MAX30105::readRegister8(uint8_t address, uint8_t reg) {
   _i2cPort->beginTransmission(address);
   _i2cPort->write(reg);
   _i2cPort->endTransmission(false);
-  _i2cPort->requestFrom(address, 1);   // Request 1 byte
+  _i2cPort->requestFrom(int(address), int(1));   // Request 1 byte //CHECK OUT SIMBLEE I2C issue
 
   int tries = 0;
   while (!_i2cPort->available())

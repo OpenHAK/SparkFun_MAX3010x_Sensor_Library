@@ -1,10 +1,10 @@
-/*************************************************** 
+/***************************************************
  This is a library written for the Maxim MAX30105 Optical Smoke Detector
  It should also work with the MAX30102. However, the MAX30102 does not have a Green LED.
 
  These sensors use I2C to communicate, as well as a single (optional)
  interrupt line that is not currently supported in this driver.
- 
+
  Written by Peter Jansen and Nathan Seidle (SparkFun)
  BSD license, all text above must be included in any redistribution.
  *****************************************************/
@@ -24,12 +24,16 @@
 
 #define I2C_SPEED_STANDARD        100000
 #define I2C_SPEED_FAST            400000
+#define BOARD_LED 29  // on board LED
+#define MAX_INT 30    // MAX30102 interrupts on this Simblee pin
+#define SCL_PIN 13
+#define SDA_PIN 10
 
 class MAX30105 {
- public: 
+ public:
   MAX30105(void);
 
-  boolean begin(TwoWire &wirePort = Wire, uint32_t i2cSpeed = I2C_SPEED_STANDARD, uint8_t i2caddr = MAX30105_ADDRESS);
+  boolean begin(TwoWire &wirePort = Wire, uint32_t i2cSpeed = I2C_SPEED_STANDARD, uint8_t sclPin = SCL_PIN, uint8_t sdaPin = SDA_PIN, uint8_t i2caddr = MAX30105_ADDRESS);
 
   uint32_t getRed(void); //Returns immediate red value
   uint32_t getIR(void); //Returns immediate IR value
@@ -38,8 +42,8 @@ class MAX30105 {
 
   // Configuration
   void softReset();
-  void shutDown(); 
-  void wakeUp(); 
+  void shutDown();
+  void wakeUp();
 
   void setLEDMode(uint8_t mode);
 
@@ -57,7 +61,7 @@ class MAX30105 {
   //Multi-led configuration mode (page 22)
   void enableSlot(uint8_t slotNumber, uint8_t device); //Given slot number, assign a device to slot
   void disableSlots(void);
-  
+
   // Data Collection
 
   //Interrupts (page 13, 14)
@@ -79,7 +83,7 @@ class MAX30105 {
   void enableFIFORollover();
   void disableFIFORollover();
   void setFIFOAlmostFull(uint8_t samples);
-  
+
   //FIFO Reading
   uint16_t check(void); //Checks for new data and fills FIFO
   uint8_t available(void); //Tells caller how many new samples are available (head - tail)
@@ -101,7 +105,7 @@ class MAX30105 {
 
   // Detecting ID/Revision
   uint8_t getRevisionID();
-  uint8_t readPartID();  
+  uint8_t readPartID();
 
   // Setup the IC with user selectable settings
   void setup(byte powerLevel = 0x1F, byte sampleAverage = 4, byte ledMode = 3, int sampleRate = 400, int pulseWidth = 411, int adcRange = 4096);
@@ -116,8 +120,8 @@ class MAX30105 {
 
   //activeLEDs is the number of channels turned on, and can be 1 to 3. 2 is common for Red+IR.
   byte activeLEDs; //Gets set during setup. Allows check() to calculate how many bytes to read from FIFO
-  
-  uint8_t revisionID; 
+
+  uint8_t revisionID;
 
   void readRevisionID();
 

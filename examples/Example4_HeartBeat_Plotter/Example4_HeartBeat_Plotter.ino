@@ -65,7 +65,7 @@ void setup()
   long baseValue = 0;
   for (byte x = 0 ; x < avgAmount ; x++)
   {
-    baseValue += particleSensor.getIR(); //Read the IR value
+    baseValue += (particleSensor.getIR() + particleSensor.getRed()); //Read the IR value
   }
   baseValue /= avgAmount;
 
@@ -76,5 +76,10 @@ void setup()
 
 void loop()
 {
-  Serial.println(particleSensor.getIR()); //Send raw data to plotter
+  long sum = particleSensor.getIR() + particleSensor.getRed();
+  // Serial.print(particleSensor.getIR()); //Send raw data to plotter
+  // Serial.print(" ");
+  // Serial.print(particleSensor.getGreen());
+  // Serial.print(" ");
+  Serial.println(sum);
 }
