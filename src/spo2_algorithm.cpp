@@ -57,16 +57,20 @@
 *******************************************************************************
 */
 
-#include "arduino.h"
+#if (ARDUINO >= 100)
+ #include "Arduino.h"
+#else
+ #include "WProgram.h"
+#endif
 #include "spo2_algorithm.h"
 
 #if defined(ARDUINO_AVR_UNO)
 //Arduino Uno doesn't have enough SRAM to store 100 samples of IR led data and red led data in 32-bit format
 //To solve this problem, 16-bit MSB of the sampled data will be truncated.  Samples become 16-bit data.
-void maxim_heart_rate_and_oxygen_saturation(uint16_t *pun_ir_buffer, int32_t n_ir_buffer_length, uint16_t *pun_red_buffer, int32_t *pn_spo2, int8_t *pch_spo2_valid, 
+void maxim_heart_rate_and_oxygen_saturation(uint16_t *pun_ir_buffer, int32_t n_ir_buffer_length, uint16_t *pun_red_buffer, int32_t *pn_spo2, int8_t *pch_spo2_valid,
                 int32_t *pn_heart_rate, int8_t *pch_hr_valid)
 #else
-void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_ir_buffer_length, uint32_t *pun_red_buffer, int32_t *pn_spo2, int8_t *pch_spo2_valid, 
+void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_ir_buffer_length, uint32_t *pun_red_buffer, int32_t *pn_spo2, int8_t *pch_spo2_valid,
                 int32_t *pn_heart_rate, int8_t *pch_hr_valid)
 #endif
 /**
@@ -90,32 +94,32 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_i
   uint32_t un_ir_mean,un_only_once ;
   int32_t k, n_i_ratio_count;
   int32_t i, s, m, n_exact_ir_valley_locs_count, n_middle_idx;
-  int32_t n_th1, n_npks, n_c_min;   
+  int32_t n_th1, n_npks, n_c_min;
   int32_t an_ir_valley_locs[15] ;
   int32_t n_peak_interval_sum;
-  
+
   int32_t n_y_ac, n_x_ac;
-  int32_t n_spo2_calc; 
-  int32_t n_y_dc_max, n_x_dc_max; 
-  int32_t n_y_dc_max_idx, n_x_dc_max_idx; 
-  int32_t an_ratio[5], n_ratio_average; 
+  int32_t n_spo2_calc;
+  int32_t n_y_dc_max, n_x_dc_max;
+  int32_t n_y_dc_max_idx, n_x_dc_max_idx;
+  int32_t an_ratio[5], n_ratio_average;
   int32_t n_nume, n_denom ;
 
   // calculates DC mean and subtract DC from ir
-  un_ir_mean =0; 
+  un_ir_mean =0;
   for (k=0 ; k<n_ir_buffer_length ; k++ ) un_ir_mean += pun_ir_buffer[k] ;
   un_ir_mean =un_ir_mean/n_ir_buffer_length ;
-    
+
   // remove DC and invert signal so that we can use peak detector as valley detector
-  for (k=0 ; k<n_ir_buffer_length ; k++ )  
-    an_x[k] = -1*(pun_ir_buffer[k] - un_ir_mean) ; 
-    
+  for (k=0 ; k<n_ir_buffer_length ; k++ )
+    an_x[k] = -1*(pun_ir_buffer[k] - un_ir_mean) ;
+
   // 4 pt Moving Average
   for(k=0; k< BUFFER_SIZE-MA4_SIZE; k++){
-    an_x[k]=( an_x[k]+an_x[k+1]+ an_x[k+2]+ an_x[k+3])/(int)4;        
+    an_x[k]=( an_x[k]+an_x[k+1]+ an_x[k+2]+ an_x[k+3])/(int)4;
   }
-  // calculate threshold  
-  n_th1=0; 
+  // calculate threshold
+  n_th1=0;
   for ( k=0 ; k<BUFFER_SIZE ;k++){
     n_th1 +=  an_x[k];
   }
@@ -125,7 +129,7 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_i
 
   for ( k=0 ; k<15;k++) an_ir_valley_locs[k]=0;
   // since we flipped signal, we use peak detector as valley detector
-  maxim_find_peaks( an_ir_valley_locs, &n_npks, an_x, BUFFER_SIZE, n_th1, 4, 15 );//peak_height, peak_distance, max_num_peaks 
+  maxim_find_peaks( an_ir_valley_locs, &n_npks, an_x, BUFFER_SIZE, n_th1, 4, 15 );//peak_height, peak_distance, max_num_peaks
   n_peak_interval_sum =0;
   if (n_npks>=2){
     for (k=1; k<n_npks; k++) n_peak_interval_sum += (an_ir_valley_locs[k] -an_ir_valley_locs[k -1] ) ;
@@ -133,53 +137,53 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_i
     *pn_heart_rate =(int32_t)( (FS*60)/ n_peak_interval_sum );
     *pch_hr_valid  = 1;
   }
-  else  { 
+  else  {
     *pn_heart_rate = -999; // unable to calculate because # of peaks are too small
     *pch_hr_valid  = 0;
   }
 
   //  load raw value again for SPO2 calculation : RED(=y) and IR(=X)
   for (k=0 ; k<n_ir_buffer_length ; k++ )  {
-      an_x[k] =  pun_ir_buffer[k] ; 
-      an_y[k] =  pun_red_buffer[k] ; 
+      an_x[k] =  pun_ir_buffer[k] ;
+      an_y[k] =  pun_red_buffer[k] ;
   }
 
   // find precise min near an_ir_valley_locs
-  n_exact_ir_valley_locs_count =n_npks; 
-  
+  n_exact_ir_valley_locs_count =n_npks;
+
   //using exact_ir_valley_locs , find ir-red DC andir-red AC for SPO2 calibration an_ratio
   //finding AC/DC maximum of raw
 
-  n_ratio_average =0; 
-  n_i_ratio_count = 0; 
+  n_ratio_average =0;
+  n_i_ratio_count = 0;
   for(k=0; k< 5; k++) an_ratio[k]=0;
   for (k=0; k< n_exact_ir_valley_locs_count; k++){
     if (an_ir_valley_locs[k] > BUFFER_SIZE ){
       *pn_spo2 =  -999 ; // do not use SPO2 since valley loc is out of range
-      *pch_spo2_valid  = 0; 
+      *pch_spo2_valid  = 0;
       return;
     }
   }
-  // find max between two valley locations 
-  // and use an_ratio betwen AC compoent of Ir & Red and DC compoent of Ir & Red for SPO2 
+  // find max between two valley locations
+  // and use an_ratio betwen AC compoent of Ir & Red and DC compoent of Ir & Red for SPO2
   for (k=0; k< n_exact_ir_valley_locs_count-1; k++){
-    n_y_dc_max= -16777216 ; 
-    n_x_dc_max= -16777216; 
+    n_y_dc_max= -16777216 ;
+    n_x_dc_max= -16777216;
     if (an_ir_valley_locs[k+1]-an_ir_valley_locs[k] >3){
         for (i=an_ir_valley_locs[k]; i< an_ir_valley_locs[k+1]; i++){
           if (an_x[i]> n_x_dc_max) {n_x_dc_max =an_x[i]; n_x_dc_max_idx=i;}
           if (an_y[i]> n_y_dc_max) {n_y_dc_max =an_y[i]; n_y_dc_max_idx=i;}
       }
       n_y_ac= (an_y[an_ir_valley_locs[k+1]] - an_y[an_ir_valley_locs[k] ] )*(n_y_dc_max_idx -an_ir_valley_locs[k]); //red
-      n_y_ac=  an_y[an_ir_valley_locs[k]] + n_y_ac/ (an_ir_valley_locs[k+1] - an_ir_valley_locs[k])  ; 
-      n_y_ac=  an_y[n_y_dc_max_idx] - n_y_ac;    // subracting linear DC compoenents from raw 
+      n_y_ac=  an_y[an_ir_valley_locs[k]] + n_y_ac/ (an_ir_valley_locs[k+1] - an_ir_valley_locs[k])  ;
+      n_y_ac=  an_y[n_y_dc_max_idx] - n_y_ac;    // subracting linear DC compoenents from raw
       n_x_ac= (an_x[an_ir_valley_locs[k+1]] - an_x[an_ir_valley_locs[k] ] )*(n_x_dc_max_idx -an_ir_valley_locs[k]); // ir
-      n_x_ac=  an_x[an_ir_valley_locs[k]] + n_x_ac/ (an_ir_valley_locs[k+1] - an_ir_valley_locs[k]); 
-      n_x_ac=  an_x[n_y_dc_max_idx] - n_x_ac;      // subracting linear DC compoenents from raw 
+      n_x_ac=  an_x[an_ir_valley_locs[k]] + n_x_ac/ (an_ir_valley_locs[k+1] - an_ir_valley_locs[k]);
+      n_x_ac=  an_x[n_y_dc_max_idx] - n_x_ac;      // subracting linear DC compoenents from raw
       n_nume=( n_y_ac *n_x_dc_max)>>7 ; //prepare X100 to preserve floating value
       n_denom= ( n_x_ac *n_y_dc_max)>>7;
       if (n_denom>0  && n_i_ratio_count <5 &&  n_nume != 0)
-      {   
+      {
         an_ratio[n_i_ratio_count]= (n_nume*100)/n_denom ; //formular is ( n_y_ac *n_x_dc_max) / ( n_x_ac *n_y_dc_max) ;
         n_i_ratio_count++;
       }
@@ -201,7 +205,7 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_i
   }
   else{
     *pn_spo2 =  -999 ; // do not use SPO2 since signal an_ratio is out of range
-    *pch_spo2_valid  = 0; 
+    *pch_spo2_valid  = 0;
   }
 }
 
@@ -231,14 +235,14 @@ void maxim_peaks_above_min_height( int32_t *pn_locs, int32_t *n_npks,  int32_t  
 {
   int32_t i = 1, n_width;
   *n_npks = 0;
-  
+
   while (i < n_size-1){
     if (pn_x[i] > n_min_height && pn_x[i] > pn_x[i-1]){      // find left edge of potential peaks
       n_width = 1;
       while (i+n_width < n_size && pn_x[i] == pn_x[i+n_width])  // find flat peaks
         n_width++;
       if (pn_x[i] > pn_x[i+n_width] && (*n_npks) < 15 ){      // find right edge of peaks
-        pn_locs[(*n_npks)++] = i;    
+        pn_locs[(*n_npks)++] = i;
         // for flat peaks, peak location is left edge
         i += n_width+1;
       }
@@ -259,9 +263,9 @@ void maxim_remove_close_peaks(int32_t *pn_locs, int32_t *pn_npks, int32_t *pn_x,
 * \retval       None
 */
 {
-    
+
   int32_t i, j, n_old_npks, n_dist;
-    
+
   /* Order peaks from large to small */
   maxim_sort_indices_descend( pn_x, pn_locs, *pn_npks );
 
@@ -279,7 +283,7 @@ void maxim_remove_close_peaks(int32_t *pn_locs, int32_t *pn_npks, int32_t *pn_x,
   maxim_sort_ascend( pn_locs, *pn_npks );
 }
 
-void maxim_sort_ascend(int32_t  *pn_x, int32_t n_size) 
+void maxim_sort_ascend(int32_t  *pn_x, int32_t n_size)
 /**
 * \brief        Sort array
 * \par          Details
@@ -304,7 +308,7 @@ void maxim_sort_indices_descend(  int32_t  *pn_x, int32_t *pn_indx, int32_t n_si
 *               Sort indices according to descending order (insertion sort algorithm)
 *
 * \retval       None
-*/ 
+*/
 {
   int32_t i, j, n_temp;
   for (i = 1; i < n_size; i++) {
@@ -314,7 +318,3 @@ void maxim_sort_indices_descend(  int32_t  *pn_x, int32_t *pn_indx, int32_t n_si
     pn_indx[j] = n_temp;
   }
 }
-
-
-
-
