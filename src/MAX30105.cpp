@@ -152,13 +152,15 @@ MAX30105::MAX30105() {
 }
 
 boolean MAX30105::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t sclPin, uint8_t sdaPin, uint8_t i2caddr) {
-
+  #ifdef DEBUG
+          Serial.println("MAX debug");
+  #endif
   _i2cPort = &wirePort; //Grab which port the user wants us to use
 
   _i2cPort->beginOnPins(sclPin,sdaPin);
   //_i2cPort->setClock(i2cSpeed);
   if(i2cSpeed != 100000){
-    NRF_TWI1->FREQUENCY = TWI_FREQUENCY_FREQUENCY_K400 << TWI_FREQUENCY_FREQUENCY_Pos; 
+    NRF_TWI1->FREQUENCY = TWI_FREQUENCY_FREQUENCY_K400 << TWI_FREQUENCY_FREQUENCY_Pos;
   }
 
   _i2caddr = i2caddr;
@@ -625,6 +627,9 @@ uint16_t MAX30105::check(void)
     //Wire.requestFrom() is limited to BUFFER_LENGTH which is 32 on the Uno
     //We may need to read as many as 288 bytes so we read in blocks no larger than 32
     //BUFFER_LENGTH should work with other platforms with larger requestFrom buffers
+    #ifdef DEBUG
+            Serial.println("Before wire block");
+    #endif
     while (bytesLeftToRead > 0)
     {
       int toGet = bytesLeftToRead;
@@ -699,6 +704,9 @@ uint16_t MAX30105::check(void)
       }
 
     } //End while (bytesLeftToRead > 0)
+    #ifdef DEBUG
+            Serial.println("After wire block");
+    #endif
 
   } //End readPtr != writePtr
 

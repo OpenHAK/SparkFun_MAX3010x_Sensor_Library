@@ -19,6 +19,7 @@
 
 #include <Wire.h>
 
+
 #define MAX30105_ADDRESS          0x57 //7-bit I2C Address
 //Note that MAX30102 has the same I2C address and Part ID
 
